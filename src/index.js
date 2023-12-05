@@ -56,7 +56,7 @@ async function task1() {
 
     console.log("sortedUsers", sortedUsers);
   } catch (err) {
-    console.error('task1', err)
+    console.error("task1", err);
   }
 }
 
@@ -76,7 +76,7 @@ async function task2() {
       `${result.modifiedCount} users updated with the 'skills' field.`
     );
   } catch (err) {
-    console.error('task2', err)
+    console.error("task2", err);
   }
 }
 
@@ -84,9 +84,15 @@ async function task2() {
 //   Filter: the document should contain the 'skills' field
 async function task3() {
   try {
+    const result = await usersCollection.findOneAndUpdate(
+      { skills: { $exists: true } },
+      { $push: { skills: { $each: ["js", "git"] } } },
+      { returnDocument: "after" }
+    );
 
+    console.log("Updated document:", result);
   } catch (err) {
-    console.error('task3', err)
+    console.error("task3", err);
   }
 }
 
@@ -94,7 +100,19 @@ async function task3() {
 //   Set firstName: "Jason", lastName: "Wood", tags: ['a', 'b', 'c'], department: 'Support'
 async function task4() {
   try {
+    const result = await usersCollection.updateOne(
+      { email: /^john/, "address.state": "CA" },
+      {
+        $set: {
+          firstName: "Jason",
+          lastName: "Wood",
+          tags: ["a", "b", "c"],
+          department: "Support",
+        },
+      }
+    );
 
+    console.log(result.modifiedCount, "document updated");
   } catch (err) {
     console.log("task4", err);
   }
@@ -103,6 +121,12 @@ async function task4() {
 // - Pull tag 'c' from the first document where firstName: "Jason", lastName: "Wood"
 async function task5() {
   try {
+    const result = await usersCollection.updateOne(
+      { "firstName": "Jason", "lastName": "Wood" },
+      { $pull: {tags:"c"}}
+    );
+
+    console.log(`Tag 'c' was pulled from ${result.modifiedCount} document.`)
   } catch (err) {
     console.log("task5", err);
   }
@@ -112,6 +136,14 @@ async function task5() {
 //   ONLY if the 'b' value does not exist in the 'tags'
 async function task6() {
   try {
+        const result = await usersCollection.updateOne(
+          { firstName: "Jason", lastName: "Wood" },
+          { $addToSet: { tags: "b" }}
+        );
+
+        console.log(
+          `Tag 'b' was pushed to ${result.modifiedCount} document.`
+        );
   } catch (err) {
     console.log("task6", err);
   }
@@ -120,6 +152,8 @@ async function task6() {
 // - Delete all users by department (Support)
 async function task7() {
   try {
+    const result = await usersCollection.deleteMany({ department: "Support" });
+    console.log(`${result.deletedCount} user was deleted.`)
   } catch (err) {
     console.log("task7", err);
   }
