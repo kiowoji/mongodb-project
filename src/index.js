@@ -2,10 +2,12 @@ import { connect, close } from "./connection.js";
 
 const db = await connect();
 const usersCollection = db.collection("users");
+const articlesCollection = db.collection("articles");
+const studentsCollection = db.collection("students");
 
 const run = async () => {
   try {
-    //await getUsersExample();
+    await getUsersExample();
     // await task1();
     // await task2();
     // await task3();
@@ -122,11 +124,11 @@ async function task4() {
 async function task5() {
   try {
     const result = await usersCollection.updateOne(
-      { "firstName": "Jason", "lastName": "Wood" },
-      { $pull: {tags:"c"}}
+      { firstName: "Jason", lastName: "Wood" },
+      { $pull: { tags: "c" } }
     );
 
-    console.log(`Tag 'c' was pulled from ${result.modifiedCount} document.`)
+    console.log(`Tag 'c' was pulled from ${result.modifiedCount} document.`);
   } catch (err) {
     console.log("task5", err);
   }
@@ -136,14 +138,12 @@ async function task5() {
 //   ONLY if the 'b' value does not exist in the 'tags'
 async function task6() {
   try {
-        const result = await usersCollection.updateOne(
-          { firstName: "Jason", lastName: "Wood" },
-          { $addToSet: { tags: "b" }}
-        );
+    const result = await usersCollection.updateOne(
+      { firstName: "Jason", lastName: "Wood" },
+      { $addToSet: { tags: "b" } }
+    );
 
-        console.log(
-          `Tag 'b' was pushed to ${result.modifiedCount} document.`
-        );
+    console.log(`Tag 'b' was pushed to ${result.modifiedCount} document.`);
   } catch (err) {
     console.log("task6", err);
   }
@@ -153,7 +153,7 @@ async function task6() {
 async function task7() {
   try {
     const result = await usersCollection.deleteMany({ department: "Support" });
-    console.log(`${result.deletedCount} user was deleted.`)
+    console.log(`${result.deletedCount} user was deleted.`);
   } catch (err) {
     console.log("task7", err);
   }
@@ -167,6 +167,31 @@ async function task7() {
 //   Pull ['tag2', 'tag1-a'] from all articles
 async function task8() {
   try {
+    const result = await articlesCollection.bulkWrite([
+      { insertOne: { document: { title: "Article 1", type: "a" } } },
+      { insertOne: { document: { title: "Article 2", type: "b" } } },
+      { insertOne: { document: { title: "Article 3", type: "c" } } },
+      {
+        updateMany: {
+          filter: { type: "a" },
+          update: { $set: { tags: ["tag1-a", "tag2-a", "tag3"] } },
+        },
+      },
+      {
+        updateMany: {
+          filter: { type: { $ne: "a" } },
+          update: { $set: { tags: ["tag2", "tag3", "super"] } },
+        },
+      },
+      {
+        updateMany: {
+          filter: {},
+          update: { $pull: { tags: { $in: ["tag2", "tag1-a"] } } },
+        },
+      },
+    ]);
+    console.log("Articles Collection created.");
+    console.log(`${result.insertedCount} documents inserted!`);
   } catch (err) {
     console.error("task8", err);
   }
@@ -175,6 +200,14 @@ async function task8() {
 // - Find all articles that contains tags 'super' or 'tag2-a'
 async function task9() {
   try {
+    const [articles] = await Promise.all([
+      articlesCollection
+        .find({})
+        .filter({ tags: { $in: ["super", "tag2-a"] } })
+        .toArray(),
+    ]);
+
+    console.log("Articles that contains tags 'super' or 'tag2-a':", articles);
   } catch (err) {
     console.log("task9", err);
   }
@@ -184,6 +217,22 @@ async function task9() {
 // - Find the student who have the worst score for homework, the result should be [ { name: <name>, worst_homework_score: <score> } ]
 async function task10() {
   try {
+    let result = await studentsCollection.aggregate([
+        { $unwind: "$scores" },
+        { $match: { "scores.type": "homework" }},
+        {
+          $group: {
+            _id: "$_id",
+            name: { $first: "$name" },
+            worst_homework_score: { $min: "$scores.score" },
+          },
+        },
+        { $sort: { worst_homework_score: 1 }},
+        { $project: { _id: 0 } },
+        { $limit: 1},
+      ]).toArray();
+
+    console.log(result);
   } catch (err) {
     console.log("task10", err);
   }
@@ -192,6 +241,24 @@ async function task10() {
 // - Calculate the average score for homework for all students, the result should be [ { avg_score: <number> } ]
 async function task11() {
   try {
+    let result = await studentsCollection.aggregate([
+        { $unwind: "$scores"},
+        { $match: { "scores.type": "homework" }},
+        {
+          $group: {
+            _id: null,
+            avg_score: { $avg: "$scores.score" },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            avg_score: 1,
+          },
+        },
+      ]).toArray();
+
+    console.log(result);
   } catch (err) {
     console.log("task11", err);
   }
@@ -200,6 +267,19 @@ async function task11() {
 // - Calculate the average score by all types (homework, exam, quiz) for each student, sort from the largest to the smallest value
 async function task12() {
   try {
+    let result = await studentsCollection.aggregate([
+        { $unwind: "$scores"},
+        { $group: {
+            _id: "$_id",
+            name: { $first: "$name" },
+            avg_score: { $avg: "$scores.score" },
+          },
+        },
+        { $sort: { avg_score: -1}},
+        { $project: { _id: 0 }},
+      ]).toArray();
+
+    console.log(result);
   } catch (err) {
     console.log("task12", err);
   }
